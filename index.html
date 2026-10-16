@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spaghetti Word Quiz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Jua&family=Nanum+Gothic:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Jua', 'Nanum Gothic', sans-serif;
+            background-color: #fef3c7;
+            touch-action: manipulation;
+            overflow-x: hidden;
+        }
+        .pot-container {
+            position: relative;
+            width: 220px;
+            height: 170px;
+            margin: 0 auto;
+        }
+        .pot {
+            width: 100%;
+            height: 100%;
+            background: #94a3b8;
+            border-radius: 0 0 60px 60px;
+            position: relative;
+            border: 6px solid #475569;
+            z-index: 10;
+        }
+        .pot-handle-l, .pot-handle-r {
+            width: 35px;
+            height: 12px;
+            background: #475569;
+            position: absolute;
+            top: 25px;
+        }
+        .pot-handle-l { left: -35px; border-radius: 8px 0 0 8px; }
+        .pot-handle-r { right: -35px; border-radius: 0 8px 8px 0; }
+        
+        .pot-interior {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 0 0 54px 54px;
+            overflow: hidden;
+            background: #cbd5e1;
+        }
+
+        /* 쫄깃한 면발 */
+        .noodles-layer {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 0%; /* 진행률에 따라 상승 */
+            background: repeating-linear-gradient(90deg, #fef08a, #fef08a 10px, #facc15 15px);
+            transition: height 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 1;
+        }
+
+        /* 소스 층 */
+        .sauce-layer {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 0%; /* 정답 수에 따라 상승 */
+            background: rgba(220, 38, 38, 0.8);
+            transition: height 1s ease, background-color 1s ease;
+            z-index: 2;
+        }
+
+        /* 탄 효과 (틀렸을 때) */
+        .burnt-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(0,0,0,0.6) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        /* 기포 및 연기 */
+        .bubble {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            animation: bubble-up 1.2s ease-out forwards;
+            z-index: 4;
+        }
+        .smoke {
+            position: absolute;
+            background: rgba(100, 100, 100, 0.5);
+            border-radius: 50%;
+            filter: blur(10px);
+            animation: smoke-up 2s ease-out forwards;
+            z-index: 5;
+        }
+
+        @keyframes bubble-up {
+            0% { bottom: 10%; opacity: 0.8; transform: scale(0.5) translateY(0); }
+            100% { bottom: 100%; opacity: 0; transform: scale(1.5) translateY(-20px); }
+        }
+        @keyframes smoke-up {
+            0% { bottom: 20%; opacity: 0.4; transform: scale(1) translateX(0); }
+            100% { bottom: 150%; opacity: 0; transform: scale(3) translateX(30px); }
+        }
+        
+        .vibrate { animation: shake 0.4s linear; }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+
+        .success-glow { animation: glow 1s ease-out; }
+        @keyframes glow {
+            0% { box-shadow: 0 0 0px #facc15; }
+            50% { box-shadow: 0 0 30px #facc15; }
+            100% { box-shadow: 0 0 0px #facc15; }
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 text-center border-4 border-orange-400">
+        <div class="text-7xl mb-4">🍝</div>
+        <h1 class="text-4xl text-orange-600 mb-6 font-bold">스파게티 요리 퀴즈</h1>
+        <div class="mb-8 space-y-4 text-xl text-gray-700">
+            <p class="font-bold">최고의 스파게티를 만들어보세요!</p>
+            <div class="bg-orange-50 p-5 rounded-2xl border-2 border-orange-200 text-left">
+                <p>✅ 문제를 맞히면? <br><span class="text-green-600">맛있는 소스가 채워져요! 🍅</span></p>
+                <p class="mt-2">❌ 문제를 틀리면? <br><span class="text-red-600">요리가 타고 검은 연기가 나요! 🔥</span></p>
+            </div>
+            <p class="text-gray-500 text-base italic mt-4">준비되셨나요 셰프님?</p>
+        </div>
+        <button onclick="startGame()" class="w-full bg-orange-500 hover:bg-orange-600 text-white text-3xl font-bold py-5 rounded-2xl shadow-lg transition-transform active:scale-95">START</button>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="hidden max-w-md w-full bg-white rounded-3xl shadow-2xl p-6 border-4 border-orange-400 relative overflow-hidden">
+        
+        <div class="flex justify-between items-center mb-4 px-2">
+            <span id="question-counter" class="text-orange-600 font-bold text-xl">1 / 12</span>
+            <span id="current-score" class="text-green-600 font-bold text-xl">맛 점수: 0</span>
+        </div>
+
+        <!-- Pot Visual Center -->
+        <div class="mb-8 relative">
+            <div id="pot-effect-container" class="pot-container">
+                <div class="pot-handle-l"></div>
+                <div class="pot-handle-r"></div>
+                <div class="pot">
+                    <div class="pot-interior">
+                        <div id="noodles-visual" class="noodles-layer"></div>
+                        <div id="sauce-visual" class="sauce-layer"></div>
+                        <div id="burnt-visual" class="burnt-layer"></div>
+                    </div>
+                </div>
+            </div>
+            <div id="status-bubble" class="text-center h-8 text-orange-500 font-bold mt-4 animate-bounce text-lg">보글보글...</div>
+        </div>
+
+        <div class="w-full bg-gray-100 rounded-full h-3 mb-6">
+            <div id="progress" class="bg-orange-400 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+        </div>
+
+        <div id="quiz-container" class="min-h-[260px] flex flex-col justify-center">
+            <div id="question-text" class="text-2xl font-bold text-center mb-8 text-gray-800 break-keep leading-tight"></div>
+            <div id="answer-options" class="grid gap-4"></div>
+        </div>
+
+        <div id="feedback-overlay" class="hidden absolute inset-0 flex flex-col items-center justify-center bg-white/90 z-50">
+            <div id="feedback-emoji" class="text-8xl mb-4"></div>
+            <div id="feedback-text" class="text-5xl font-black mb-2"></div>
+            <div id="feedback-sub" class="text-2xl text-gray-600 font-bold text-center px-4"></div>
+        </div>
+    </div>
+
+    <!-- Result Screen -->
+    <div id="result-screen" class="hidden max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 text-center border-4 border-orange-400">
+        <h2 class="text-3xl font-bold mb-2">과연 결과는?</h2>
+        <div id="result-visual" class="text-9xl my-8"></div>
+        <p id="result-message" class="text-2xl mb-8 font-bold text-gray-700 break-keep"></p>
+        <button onclick="location.reload()" class="w-full bg-orange-500 text-white text-2xl font-bold py-5 rounded-2xl shadow-md active:scale-95">새로운 요리 시작</button>
+    </div>
+
+    <script>
+        let audioCtx;
+        let ambientInterval;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playTone(freq, type, duration, volume = 0.1) {
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        const sounds = {
+            correct: () => {
+                playTone(523.25, 'sine', 0.2, 0.3); 
+                setTimeout(() => playTone(659.25, 'sine', 0.2, 0.3), 100);
+                setTimeout(() => playTone(783.99, 'sine', 0.4, 0.3), 200);
+            },
+            wrong: () => {
+                playTone(150, 'sawtooth', 0.4, 0.2);
+                setTimeout(() => playTone(100, 'sawtooth', 0.6, 0.2), 150);
+            },
+            boil: () => playTone(150 + Math.random() * 200, 'sine', 0.1, 0.04)
+        };
+
+        const wordData = [
+            { word: "always", meaning: "언제나, 항상", eng: "at all times", type: "multiple" },
+            { word: "important", meaning: "중요한", eng: "having great value or needing attention", type: "ox", statement: "'Important' means having very little value.", correct: false },
+            { word: "often", meaning: "자주", eng: "a lot or many times; frequently", type: "blank" },
+            { word: "safe", meaning: "안전한", eng: "not in danger, free from risk", type: "multiple" },
+            { word: "send", meaning: "보내다", eng: "to cause something to go from one place to another", type: "blank" },
+            { word: "sometimes", meaning: "때때로, 가끔", eng: "on some occasions but not always", type: "ox", statement: "'Sometimes' means something happens every single day.", correct: false },
+            { word: "spend", meaning: "쓰다, 보내다", eng: "to use money or time", type: "multiple" },
+            { word: "text", meaning: "문자 메시지, 보내다", eng: "any written material; to send a message", type: "blank" },
+            { word: "text neck", meaning: "거북목", eng: "a medical condition from looking down at phones", type: "multiple" },
+            { word: "stretch", meaning: "뻗다, 늘이다", eng: "to spread out your arms, legs, or body as far as possible", type: "ox", statement: "To 'stretch' is to spread out your body as far as possible.", correct: true },
+            { word: "mirror", meaning: "거울", eng: "an object that reflects an image", type: "blank" },
+            { word: "rest", meaning: "쉬다, 휴식", eng: "to stop an activity to get energy back", type: "multiple" }
+        ];
+
+        let currentIdx = 0;
+        let score = 0;
+        let failCount = 0;
+        const total = wordData.length;
+
+        function startGame() {
+            initAudio();
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            showQuestion();
+            startCookingLoop();
+        }
+
+        function startCookingLoop() {
+            ambientInterval = setInterval(() => {
+                if (currentIdx < total) {
+                    sounds.boil();
+                    if(Math.random() > 0.8) createBubble('bubble');
+                } else {
+                    clearInterval(ambientInterval);
+                }
+            }, 200);
+        }
+
+        function createBubble(type) {
+            const b = document.createElement('div');
+            b.className = type;
+            const size = Math.random() * 25 + 10;
+            b.style.width = size + 'px';
+            b.style.height = size + 'px';
+            b.style.left = (20 + Math.random() * 60) + '%';
+            document.querySelector('.pot-interior').appendChild(b);
+            setTimeout(() => b.remove(), 2000);
+        }
+
+        function showQuestion() {
+            const q = wordData[currentIdx];
+            document.getElementById('question-counter').innerText = `${currentIdx + 1} / ${total}`;
+            const qText = document.getElementById('question-text');
+            const options = document.getElementById('answer-options');
+            
+            document.getElementById('progress').style.width = (currentIdx / total * 100) + "%";
+            options.innerHTML = "";
+            
+            // 냄비 면발 높이 업데이트 (진행도에 따라 면이 채워짐)
+            document.getElementById('noodles-visual').style.height = `${((currentIdx + 1) / total) * 90}%`;
+
+            if (q.type === "multiple") {
+                qText.innerHTML = `<span class="text-blue-600 text-3xl">"${q.eng}"</span><br><p class="text-lg mt-2 font-normal">이 뜻에 맞는 단어를 고르세요!</p>`;
+                const choices = [q.word, "never", "danger", "happy"];
+                shuffle(choices).forEach(choice => {
+                    options.appendChild(createBtn(choice, () => checkAnswer(choice === q.word)));
+                });
+            } 
+            else if (q.type === "blank") {
+                qText.innerHTML = `<span class="text-orange-600 text-4xl">"${q.meaning}"</span><br><p class="text-lg mt-2 font-normal">빈칸에 직접 입력하세요!</p>`;
+                const input = document.createElement('input');
+                input.type = "text";
+                input.className = "w-full text-3xl p-5 border-4 border-orange-200 rounded-3xl text-center focus:outline-none focus:border-orange-500 shadow-lg";
+                input.placeholder = `${q.word.length}글자 단어`;
+                input.onkeypress = (e) => { if(e.key === 'Enter') { checkAnswer(input.value.toLowerCase().trim() === q.word.toLowerCase()); input.blur(); }};
+                options.appendChild(input);
+                setTimeout(() => input.focus(), 100);
+            }
+            else if (q.type === "ox") {
+                qText.innerHTML = `<span class="bg-yellow-200 px-3 rounded-lg text-lg">O/X 퀴즈</span><br><br><p class="text-2xl">${q.statement}</p>`;
+                const grid = document.createElement('div');
+                grid.className = "grid grid-cols-2 gap-4";
+                grid.appendChild(createBtn("O", () => checkAnswer(q.correct === true), "bg-blue-500 text-white text-5xl py-6 border-none shadow-xl"));
+                grid.appendChild(createBtn("X", () => checkAnswer(q.correct === false), "bg-red-500 text-white text-5xl py-6 border-none shadow-xl"));
+                options.appendChild(grid);
+            }
+        }
+
+        function createBtn(text, onClick, extraClass = "") {
+            const b = document.createElement('button');
+            b.innerText = text;
+            b.className = extraClass || "bg-white hover:bg-orange-50 text-orange-800 text-2xl font-bold py-5 border-4 border-orange-100 rounded-3xl transition-all active:scale-90 shadow-md";
+            b.onclick = onClick;
+            return b;
+        }
+
+        function checkAnswer(isCorrect) {
+            const overlay = document.getElementById('feedback-overlay');
+            const fbEmoji = document.getElementById('feedback-emoji');
+            const fbText = document.getElementById('feedback-text');
+            const fbSub = document.getElementById('feedback-sub');
+            const pot = document.getElementById('pot-effect-container');
+            const sauce = document.getElementById('sauce-visual');
+            const burnt = document.getElementById('burnt-visual');
+
+            overlay.classList.remove('hidden');
+            
+            if (isCorrect) {
+                score++;
+                sounds.correct();
+                fbEmoji.innerText = "✨";
+                fbText.innerText = "Excellent!";
+                fbText.className = "text-green-500 font-black text-6xl feedback-pop";
+                fbSub.innerText = "정답! 소스가 아주 맛있어지고 있어요! 🍅";
+                
+                // 시각 효과: 소스 차오름 & 빛남
+                sauce.style.height = `${(score / total) * 100}%`;
+                sauce.style.backgroundColor = `rgba(220, 38, 38, ${0.4 + (score/total)*0.6})`;
+                pot.classList.add('success-glow');
+                setTimeout(() => pot.classList.remove('success-glow'), 1000);
+                for(let i=0; i<10; i++) createBubble('bubble');
+            } else {
+                failCount++;
+                sounds.wrong();
+                fbEmoji.innerText = "💨";
+                fbText.innerText = "Woops!";
+                fbText.className = "text-red-500 font-black text-6xl feedback-pop";
+                fbSub.innerText = "틀렸어요! 요리가 타고 있어요... 🤢";
+                
+                // 시각 효과: 연기 & 흔들림 & 탄 자국
+                pot.classList.add('vibrate');
+                setTimeout(() => pot.classList.remove('vibrate'), 500);
+                burnt.style.opacity = Math.min(failCount * 0.2, 1);
+                for(let i=0; i<8; i++) createBubble('smoke');
+            }
+
+            document.getElementById('current-score').innerText = `맛 점수: ${score}`;
+
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+                currentIdx++;
+                if (currentIdx < total) {
+                    showQuestion();
+                } else {
+                    showResult();
+                }
+            }, 1800);
+        }
+
+        function showResult() {
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.remove('hidden');
+            
+            const visual = document.getElementById('result-visual');
+            const msg = document.getElementById('result-message');
+            const ratio = score / total;
+
+            if (ratio >= 0.9) {
+                visual.innerHTML = "👨‍🍳🍝🥇";
+                msg.innerText = "환상적인 미슐랭 3스타 스파게티!\n당신은 완벽한 셰프입니다!";
+            } else if (ratio >= 0.6) {
+                visual.innerHTML = "🍝👌✨";
+                msg.innerText = "맛있는 스파게티가 완성됐어요!\n손님들이 기뻐할 거예요.";
+            } else if (ratio >= 0.3) {
+                visual.innerHTML = "🥣⚠️";
+                msg.innerText = "조금 짜고 소스가 부족하지만...\n먹을 만한 요리네요!";
+            } else {
+                visual.innerHTML = "💀🔥🍳";
+                msg.innerText = "앗! 스파게티가 숯덩이가 됐어요.\n소화기를 가져오세요!!";
+            }
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+    </script>
+</body>
+</html>
